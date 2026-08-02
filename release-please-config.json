@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "skip-github-pull-request": true,
+  "packages": {
+    ".": {
+      "release-type": "go",
+      "package-name": "notes-app"
+    }
+  }
+}
