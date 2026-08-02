@@ -1,0 +1,20 @@
+# Staging configuration
+# This file contains environment-specific settings for staging deployment
+
+notes:
+  directory: "/mnt/staging/notes-app"
+
+auth:
+  google:
+    client_id: ""  # Set via NOTES_APP_AUTH_GOOGLE_CLIENT_ID
+    client_secret: ""  # Set via NOTES_APP_AUTH_GOOGLE_CLIENT_SECRET
+    callback_url: "https://staging.your-domain.com/auth/google/callback"
+  github:
+    client_id: ""  # Set via NOTES_APP_AUTH_GITHUB_CLIENT_ID
+    client_secret: ""  # Set via NOTES_APP_AUTH_GITHUB_CLIENT_SECRET
+    callback_url: "https://staging.your-domain.com/auth/github/callback"
+  session:
+    cookie_name: "notes_session"
+    cookie_secret: ""  # Set via NOTES_APP_AUTH_SESSION_COOKIE_SECRET
+    duration: "24h"
+  guest_session_duration: "4h"

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 15px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .message {
+            color: #dc3545;
+            margin-bottom: 15px;
+        }
+        .notes-list {
+            margin-top: 30px;
+        }
+        .notes-list h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .notes-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .notes-list li {
+            padding: 10px;
+            background-color: #f8f9fa;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .notes-list a {
+            color: #007bff;
+            text-decoration: none;
+            display: block;
+        }
+        .notes-list a:hover {
+            text-decoration: underline;
+        }
+        .auth-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .user-name {
+            font-weight: 500;
+            color: #333;
+        }
+        .auth-button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #333;
+            font-size: 14px;
+        }
+        .auth-button:hover {
+            background-color: #f8f9fa;
+        }
+        .guest-badge {
+            background-color: #6c757d;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="auth-header">
+            {{if .User}}
+            <div class="user-info">
+                {{if .User.AvatarURL}}
+                <img src="{{.User.AvatarURL}}" alt="Avatar" class="user-avatar">
+                {{else}}
+                <div class="user-avatar">{{index .User.Name 0}}</div>
+                {{end}}
+                <span class="user-name">{{.User.Name}}</span>
+                {{if .User.IsGuest}}
+                <span class="guest-badge">Guest</span>
+                {{end}}
+            </div>
+            <a href="/logout" class="auth-button">Logout</a>
+            {{else}}
+            <a href="/login" class="auth-button">Login</a>
+            {{end}}
+        </div>
+        
+        <h1>Notes App</h1>
+        
+        {{if .Message}}
+        <div class="message">{{.Message}}</div>
+        {{end}}
+        
+        <form method="POST" action="/notes/">
+            <input type="text" name="title" placeholder="Title (required)" value="{{.Title}}" required>
+            <textarea name="content" placeholder="Write your note here (Markdown supported)...">{{.Content}}</textarea>
+            {{if .OriginalFilename}}
+            <input type="hidden" name="original_filename" value="{{.OriginalFilename}}">
+            {{end}}
+            <button type="submit">Save Note</button>
+        </form>
+        
+        {{if .Notes}}
+        <div class="notes-list">
+            <h2>Saved Notes</h2>
+            <ul>
+                {{range .Notes}}
+                <li><a href="/note/{{.}}">{{.}}</a></li>
+                {{end}}
+            </ul>
+        </div>
+        {{end}}
+    </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Production configuration
+# This file contains environment-specific settings for production deployment
+# Secrets should be passed via environment variables, not committed to this file
+
+notes:
+  directory: "/var/lib/notes-app"
+
+auth:
+  google:
+    client_id: ""  # Set via NOTES_APP_AUTH_GOOGLE_CLIENT_ID
+    client_secret: ""  # Set via NOTES_APP_AUTH_GOOGLE_CLIENT_SECRET
+    callback_url: "https://your-domain.com/auth/google/callback"
+  github:
+    client_id: ""  # Set via NOTES_APP_AUTH_GITHUB_CLIENT_ID
+    client_secret: ""  # Set via NOTES_APP_AUTH_GITHUB_CLIENT_SECRET
+    callback_url: "https://your-domain.com/auth/github/callback"
+  session:
+    cookie_name: "notes_session"
+    cookie_secret: ""  # Set via NOTES_APP_AUTH_SESSION_COOKIE_SECRET
+    duration: "168h"  # 7 days
+  guest_session_duration: "24h"
