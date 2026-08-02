@@ -29,6 +29,15 @@ Complete guide to testing strategies and implementation:
 - Best practices for maintainable tests
 - CI/CD integration examples
 
+### [Firebase Migration Plan](FIREBASE_MIGRATION_PLAN.md)
+Plan for splitting the website into a separate `notes-webpage` repo hosted on
+Firebase Hosting, with Firebase Auth replacing the current OAuth/cookie-session
+system:
+- Target Go JSON API surface and Firebase ID token verification approach
+- File-by-file disposition of the current auth/template code
+- Test migration strategy
+- Sequenced implementation steps (not yet executed)
+
 ## Documentation Standards
 
 When adding new documentation:
