@@ -57,7 +57,7 @@ func (g *GoogleOAuthClient) ExchangeCode(code string) (*OAuthProfile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -133,7 +133,7 @@ func (g *GitHubOAuthClient) ExchangeCode(code string) (*OAuthProfile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -180,7 +180,7 @@ func (g *GitHubOAuthClient) getPrimaryEmail(client *http.Client) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("failed to get user emails: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)

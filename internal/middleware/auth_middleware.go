@@ -111,7 +111,7 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 		if !ok || !authenticated {
 			// Not authenticated, continue with session ID only (guest)
 			if sessionCreated {
-				session.Save(r, w)
+				_ = session.Save(r, w)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
@@ -121,7 +121,7 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 		if !ok || userID == "" {
 			// No user ID, continue with session ID only (guest)
 			if sessionCreated {
-				session.Save(r, w)
+				_ = session.Save(r, w)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
@@ -132,7 +132,7 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 		if err != nil || user == nil {
 			// User not found or error, continue with session ID only (guest)
 			if sessionCreated {
-				session.Save(r, w)
+				_ = session.Save(r, w)
 			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
