@@ -80,17 +80,28 @@ traffic).
 
 ## Tasks
 
-| # | Task | Notes |
-|---|---|---|
-| 1 | Bootstrap Terraform config and Infrastructure Manager | New `infra/` directory in this repo: `provider "google"`, backend/state managed by Infrastructure Manager (`gcloud infra-manager deployments apply`, not local/self-hosted state). See Tooling choice below for why. |
-| 2 | Enable required GCP APIs via Terraform | `google_project_service` for `run.googleapis.com`, `artifactregistry.googleapis.com`, `iamcredentials.googleapis.com`. Declarative, not a manual `gcloud services enable` step. |
-| 3 | Create an Artifact Registry Docker repository | `google_artifact_registry_repository`. Standardize the deploy source on Artifact Registry (native Cloud Run integration) rather than pulling from GHCR at deploy time. |
-| 4 | Create a dedicated deploy service account | `google_service_account` + `google_project_iam_member` grants, least privilege: `roles/run.admin` (scoped to the service once it exists), `roles/iam.serviceAccountUser`, `roles/artifactregistry.writer`. No broad `Editor`/`Owner`. |
-| 5 | Set up Workload Identity Federation | `google_iam_workload_identity_pool` + `google_iam_workload_identity_pool_provider`, trust condition restricted to `bscheibe/notes-app`, bound to the deploy service account from #4. This is the actual "automate + keep secure" answer to question 2 - zero long-lived keys in GitHub Secrets. |
-| 6 | Create the Cloud Run service | `google_cloud_run_v2_service`: `ingress: all`, IAM invoker `allUsers` (`google_cloud_run_v2_service_iam_member`), `min-instances: 0` (no need to stay warm - not serving traffic yet). App-layer Firebase token verification does the real access gating once that migration lands. `max-instances` set per task #9 in the same resource, not added later. |
-| 7 | Add a deploy workflow | New `deploy.yml` (or extend `release.yml`), using `google-github-actions/auth` (WIF) to authenticate, then running `terraform apply` (or `gcloud infra-manager deployments apply`) against the config from #1. Gated the same way the existing `binary`/`image` jobs are. Wire it up; don't need to actually trigger/run it yet. |
-| 8 | Decide image source for the Cloud Run service | Either the Artifact Registry repo from #3, or point directly at the already-published `ghcr.io/bscheibe/notes-app` image. Decide before #7 is finalized. |
-| 9 | Set a strict cost-surge cap on the service | `max-instances` set low (single digits) rather than Cloud Run's default of 100 - the real lever against a cost blowout from a traffic spike or abuse against the public, auth-gated endpoint. Pair with a conservative per-instance `concurrency` setting and a short request `timeout`. Once capped, excess requests during a surge get `429`s instead of Cloud Run scaling (and billing) without bound. Cheap, Cloud Run-native, no new infrastructure - unlike Cloud Armor (see below), this requires no load balancer/NEG topology. |
+All 9 tasks below are implemented and have been applied to the real
+`notes-app-gcp-504419` project. Scope ended up split across two layers, not
+one - see [CLOUD_RUN_CICD_BOOTSTRAP.md](CLOUD_RUN_CICD_BOOTSTRAP.md) for why:
+CI/CD plumbing (APIs, the deploy service account and its IAM roles, WIF, the
+Artifact Registry repo) is one-time setup applied by hand via `gcloud`, not
+Terraform. Only the Cloud Run service itself is Terraform-managed, in
+[`infra/`](../infra), applied manually (`terraform apply` run by a human) -
+not by CI, and not via Infrastructure Manager on every release. See
+[CLOUD_RUN_GCP_RESOURCES.md](CLOUD_RUN_GCP_RESOURCES.md) for the full
+resource inventory.
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| 1 | Bootstrap Terraform config | Done | [`infra/`](../infra): `provider.tf`, `versions.tf`, `variables.tf`. State is local, applied manually by a human - no CI-triggered apply, no Infrastructure Manager. |
+| 2 | Enable required GCP APIs | Done | `run.googleapis.com`, `artifactregistry.googleapis.com`, `iamcredentials.googleapis.com`, `iam.googleapis.com` (the last needed for the service account + WIF resources in #4/#5) - enabled via `gcloud services enable`, one time, per [CLOUD_RUN_CICD_BOOTSTRAP.md](CLOUD_RUN_CICD_BOOTSTRAP.md). |
+| 3 | Create an Artifact Registry Docker repository | Done | Created via `gcloud artifacts repositories create`, per [CLOUD_RUN_CICD_BOOTSTRAP.md](CLOUD_RUN_CICD_BOOTSTRAP.md). Deploy source standardized on Artifact Registry; `release.yml`'s `image` job pushes there in addition to GHCR. |
+| 4 | Create a dedicated deploy service account | Done | Created via `gcloud iam service-accounts create`, per [CLOUD_RUN_CICD_BOOTSTRAP.md](CLOUD_RUN_CICD_BOOTSTRAP.md). `roles/run.admin` scoped to the `notes-app` service specifically (via [`infra/deploy_service_account.tf`](../infra/deploy_service_account.tf)'s `google_cloud_run_v2_service_iam_member`, not a project-level grant), plus `roles/iam.serviceAccountUser` and `roles/artifactregistry.writer` at the project level. |
+| 5 | Set up Workload Identity Federation | Done | Pool + OIDC provider created via `gcloud iam workload-identity-pools`, per [CLOUD_RUN_CICD_BOOTSTRAP.md](CLOUD_RUN_CICD_BOOTSTRAP.md), `attribute_condition` restricted to `assertion.repository == "bscheibe/notes-app"`, bound to the deploy service account. Zero long-lived keys in GitHub Secrets - the 4 repo secrets (`GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_DEPLOY_SERVICE_ACCOUNT`, `GCP_PROJECT_ID`, `GCP_REGION`) are resource identifiers, not credentials. |
+| 6 | Create the Cloud Run service | Done | [`infra/cloud_run.tf`](../infra/cloud_run.tf): `google_cloud_run_v2_service`, `ingress: INGRESS_TRAFFIC_ALL`, `min_instance_count: 0`. Deployed with Google's public placeholder image (`us-docker.pkg.dev/cloudrun/container/hello`) initially - Terraform's `image` field has `lifecycle.ignore_changes` so it won't fight `deploy.yml`'s per-release image updates. **No public invoker binding yet** - only the deploy service account can invoke it until Firebase auth verification is the real access gate (see `cloud_run.tf`'s standby comment). |
+| 7 | Add a deploy workflow | Done | [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml): triggers on `workflow_run` of `release` completing successfully, authenticates via WIF, runs `gcloud run deploy --image=...` to roll out the release's actual image onto the already-existing service (resolved from the git tag on the triggering commit, since `workflow_run` doesn't expose the other workflow's job outputs directly). Does not touch infrastructure - that's a separate, manual `terraform apply`. |
+| 8 | Decide image source for the Cloud Run service | Done | **Artifact Registry**, not GHCR - native Cloud Run integration, no cross-registry pull auth needed. `release.yml`'s `image` job pushes to both; Cloud Run only ever pulls from Artifact Registry. |
+| 9 | Set a strict cost-surge cap on the service | Done | Set in the same `google_cloud_run_v2_service` resource as #6: `max_instance_count: 3`, `max_instance_request_concurrency: 10`, `timeout: "30s"`. Once capped, excess requests during a surge get `429`s instead of unbounded scaling and billing. |
 
 ## Explicitly out of scope / flagged, not a task yet
 
@@ -128,20 +139,31 @@ already-paid), or genuine DDoS exposure.
 
 ## Tooling choice
 
-**Terraform (`google` provider), deployed via Google Cloud Infrastructure
-Manager**, rather than raw `gcloud` CLI commands. Infrastructure Manager
-runs the Terraform apply as a managed GCP service - it hosts the state
-backend and execution, so there's no self-hosted state bucket/locking or a
-Terraform-runner step to build in CI beyond authenticating and triggering
-it. This gives declarative config, `plan` review, and drift detection for
-the GCP resources in this plan without taking on Terraform's usual
-operational overhead of managing state yourself.
+**Terraform (`google` provider)** for the Cloud Run service, applied
+manually by a human, not via CI and not via Infrastructure Manager. This
+gives declarative config, `plan`/preview review, and drift detection for
+the one resource that's worth having that for (the Cloud Run service and
+its IAM binding) without introducing a CI-triggered identity capable of
+creating or modifying cloud resources on a merged PR.
 
-This is a departure from how repo-level config (Dependabot, branch
-ruleset) was applied directly via API/CLI earlier in this project - that
-was for one-off GitHub settings, not a growing set of interdependent cloud
-resources (APIs, Artifact Registry, service accounts, WIF, the Cloud Run
-service itself) where `plan`/drift-detection has real value.
+Infrastructure Manager (Google-hosted Terraform state + execution) was
+tried first, per an earlier version of this plan. It was dropped after
+repeated friction: its state is entirely separate from any local
+Terraform state, so every fresh `deployments apply` attempts to `create`
+all resources from scratch and needs either broad create-permission IAM
+grants or resource-by-resource state seeding to reconcile against
+already-existing infrastructure; several resource types (e.g.
+`google_iam_workload_identity_pool`) aren't supported by its
+`--import-existing-resources` auto-import path at all. None of that
+complexity is worth it for a single-resource Terraform root applied by
+hand. `gcloud infra-manager previews create` (Infra Manager's `plan`
+equivalent) is still used as a one-off dry-run check before an apply, but
+Infra Manager does not own state or run the apply itself.
+
+CI/CD plumbing (the deploy service account, its IAM roles, WIF, the
+Artifact Registry repo) isn't in Terraform's scope at all - see
+[CLOUD_RUN_CICD_BOOTSTRAP.md](CLOUD_RUN_CICD_BOOTSTRAP.md) for why it's
+one-time `gcloud` setup instead.
 
 **Why not a GCP-native alternative to CloudFormation instead:** looked for
 one specifically to avoid the Terraform provider dependency. There isn't a
@@ -150,12 +172,11 @@ real one as of this plan:
 - **Deployment Manager** was GCP's actual CloudFormation-equivalent (native
   YAML/Jinja/Python templates, no external provider) but **reached end of
   support on March 31, 2026** - not viable going forward.
-- Its official replacement, **Infrastructure Manager**, is not a native
-  alternative - it's Terraform itself, with Google hosting the state
-  backend and running `apply` for you. The `provider "google"` HCL
-  dependency is unavoidable either way; what Infrastructure Manager removes
-  is the self-hosted-backend/CI-runner burden, which is the part worth
-  having for this plan.
+- **Infrastructure Manager**, its official replacement, is not a native
+  alternative either - it's Terraform itself, with Google hosting the state
+  backend and running `apply` for you (see above for why that hosting
+  wasn't worth it here). The `provider "google"` HCL dependency is
+  unavoidable either way.
 - **Config Connector** is a genuinely different (Kubernetes-native,
   CRD-based) model, but requires a GKE cluster to run at all - not
   applicable, since this project isn't on GKE and provisioning a cluster

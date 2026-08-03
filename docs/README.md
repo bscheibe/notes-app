@@ -43,10 +43,24 @@ Plan for standing up the API on Google Cloud Run:
 - Why the API must run with public ingress, and how Firebase ID token
   verification is the actual access boundary instead
 - GCP's ingress vs. IAM invoker model and Workload Identity Federation
-- Infrastructure task list (Artifact Registry, service accounts, WIF, deploy
-  workflow)
+- Infrastructure task list, all 9 tasks implemented - split between
+  one-time `gcloud` CI/CD setup and Terraform-managed application infra
+  ([`infra/`](../infra))
 - Known blocker: local-disk note storage is incompatible with Cloud Run's
   ephemeral filesystem
+
+### [CI/CD Bootstrap](CLOUD_RUN_CICD_BOOTSTRAP.md)
+One-time, manually-applied `gcloud` setup for the CI/CD identity itself -
+the deploy service account, its IAM roles, Workload Identity Federation,
+and the Artifact Registry repo - kept separate from the Terraform-managed
+application infrastructure.
+
+### [GCP Resources Created](CLOUD_RUN_GCP_RESOURCES.md)
+Inventory of every GCP resource actually created while implementing the
+plan above, why each one exists, and a cost analysis:
+- What's billable vs. free, and current actual spend (effectively $0)
+- Current exposure (none - no public invoker binding yet)
+- Standby-state rationale for the current configuration
 
 ## Documentation Standards
 
