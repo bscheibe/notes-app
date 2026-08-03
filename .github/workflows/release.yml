@@ -9,69 +9,15 @@ permissions:
   packages: write
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Build
-        run: go build ./...
-
-      - name: Test
-        run: go test ./... -race -shuffle=on
-
-  # Non-functional checks (formatting, static analysis, vulnerability scan) -
-  # split from build-and-test so they show as their own PR check, and run in
-  # parallel with it rather than after, since neither depends on the other's
-  # output.
-  quality-scans:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Verify module checksums
-        run: go mod verify
-
-      - name: Check formatting
-        run: |
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "The following files are not gofmt-formatted:"
-            echo "$unformatted"
-            exit 1
-          fi
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.12.2
-
-      - name: Vulnerability scan
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+  # Same build/test/quality checks a PR gets, run again on push to main -
+  # defense in depth in case a PR was merged with checks bypassed or a
+  # required check was misconfigured. Single source of truth in ci.yml so
+  # this and the PR gate can't drift out of sync with each other.
+  ci:
+    uses: ./.github/workflows/ci.yml
 
   tag-and-release:
-    needs: [build-and-test, quality-scans]
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
