@@ -38,6 +38,16 @@ system:
 - Test migration strategy
 - Sequenced implementation steps (not yet executed)
 
+### [Cloud Run Deployment Plan](CLOUD_RUN_DEPLOYMENT_PLAN.md)
+Plan for standing up the API on Google Cloud Run:
+- Why the API must run with public ingress, and how Firebase ID token
+  verification is the actual access boundary instead
+- GCP's ingress vs. IAM invoker model and Workload Identity Federation
+- Infrastructure task list (Artifact Registry, service accounts, WIF, deploy
+  workflow)
+- Known blocker: local-disk note storage is incompatible with Cloud Run's
+  ephemeral filesystem
+
 ## Documentation Standards
 
 When adding new documentation:
