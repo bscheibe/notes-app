@@ -58,12 +58,10 @@ func NewNoteHandler(service *service.NoteService, logger *slog.Logger, metrics *
 
 // HandleHome handles the home page with note list
 func (h *NoteHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	// Start tracing span if enabled
 	var span trace.Span
 	if h.tracer != nil {
-		ctx, span = h.tracer.StartSpan(ctx, "HandleHome")
+		_, span = h.tracer.StartSpan(r.Context(), "HandleHome")
 		defer span.End()
 	}
 
@@ -110,12 +108,10 @@ func (h *NoteHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 
 // HandleViewNote handles viewing a specific note
 func (h *NoteHandler) HandleViewNote(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	// Start tracing span if enabled
 	var span trace.Span
 	if h.tracer != nil {
-		ctx, span = h.tracer.StartSpan(ctx, "HandleViewNote")
+		_, span = h.tracer.StartSpan(r.Context(), "HandleViewNote")
 		defer span.End()
 	}
 

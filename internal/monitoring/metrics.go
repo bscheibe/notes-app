@@ -18,24 +18,24 @@ import (
 // Metrics holds all application metrics
 type Metrics struct {
 	// HTTP metrics
-	HttpRequestsTotal     *prometheus.CounterVec
-	HttpRequestDuration   *prometheus.HistogramVec
+	HttpRequestsTotal      *prometheus.CounterVec
+	HttpRequestDuration    *prometheus.HistogramVec
 	HttpRequestsInProgress *prometheus.GaugeVec
 
 	// Application metrics
-	NotesTotal      prometheus.Counter
-	NotesCreated    prometheus.Counter
-	NotesUpdated    prometheus.Counter
-	NotesDeleted    prometheus.Counter
-	NotesReadErrors prometheus.Counter
+	NotesTotal       prometheus.Counter
+	NotesCreated     prometheus.Counter
+	NotesUpdated     prometheus.Counter
+	NotesDeleted     prometheus.Counter
+	NotesReadErrors  prometheus.Counter
 	NotesWriteErrors prometheus.Counter
 
 	// OTEL metrics
-	noteCreateCounter    metric.Int64Counter
-	noteUpdateCounter    metric.Int64Counter
-	noteDeleteCounter    metric.Int64Counter
-	noteReadDuration     metric.Float64Histogram
-	noteWriteDuration    metric.Float64Histogram
+	noteCreateCounter metric.Int64Counter
+	noteUpdateCounter metric.Int64Counter
+	noteDeleteCounter metric.Int64Counter
+	noteReadDuration  metric.Float64Histogram
+	noteWriteDuration metric.Float64Histogram
 }
 
 // NewMetrics initializes all Prometheus and OTEL metrics

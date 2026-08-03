@@ -282,7 +282,7 @@ func TestNoteRepository_Ping(t *testing.T) {
 		logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		repo := &NoteRepository{
 			baseDirectory: "/nonexistent/directory/path",
-			logger:    logger,
+			logger:        logger,
 		}
 		err := repo.Ping()
 		assert.Error(t, err)
