@@ -55,7 +55,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           allow-initial-development-versions: true
 
-  binary:
+  release-binary:
     needs: tag-and-release
     if: needs.tag-and-release.outputs.version != ''
     runs-on: ubuntu-latest
@@ -86,7 +86,7 @@ jobs:
           tag_name: v${{ needs.tag-and-release.outputs.version }}
           files: notes-app-linux-amd64
 
-  image:
+  release-image:
     needs: tag-and-release
     if: needs.tag-and-release.outputs.version != ''
     runs-on: ubuntu-latest
@@ -113,7 +113,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # WIF, not a downloaded service-account key - see infra/workload_identity_federation.tf.
+      # WIF, not a downloaded service-account key - see docs/CLOUD_RUN_CICD_BOOTSTRAP.md.
       - name: Authenticate to GCP via Workload Identity Federation
         id: auth
         uses: google-github-actions/auth@v2
