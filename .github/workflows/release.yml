@@ -22,6 +22,29 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./... -race -shuffle=on
+
+  # Non-functional checks (formatting, static analysis, vulnerability scan) -
+  # split from build-and-test so they show as their own PR check, and run in
+  # parallel with it rather than after, since neither depends on the other's
+  # output.
+  quality-scans:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
       - name: Verify module checksums
         run: go mod verify
 
@@ -34,9 +57,6 @@ jobs:
             exit 1
           fi
 
-      - name: Build
-        run: go build ./...
-
       - name: Vet
         run: go vet ./...
 
@@ -45,16 +65,13 @@ jobs:
         with:
           version: v2.12.2
 
-      - name: Test
-        run: go test ./... -race -shuffle=on
-
       - name: Vulnerability scan
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
   tag-and-release:
-    needs: build-and-test
+    needs: [build-and-test, quality-scans]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
