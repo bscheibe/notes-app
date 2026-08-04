@@ -9,35 +9,15 @@ permissions:
   packages: write
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Build
-        run: go build ./...
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test ./... -race -shuffle=on
-
-      - name: Vulnerability scan
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+  # Same build/test/quality checks a PR gets, run again on push to main -
+  # defense in depth in case a PR was merged with checks bypassed or a
+  # required check was misconfigured. Single source of truth in ci.yml so
+  # this and the PR gate can't drift out of sync with each other.
+  ci:
+    uses: ./.github/workflows/ci.yml
 
   tag-and-release:
-    needs: build-and-test
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -55,11 +35,15 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           allow-initial-development-versions: true
 
-  binary:
+  release-binary:
     needs: tag-and-release
     if: needs.tag-and-release.outputs.version != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,17 +64,38 @@ jobs:
         run: |
           go build -trimpath -ldflags="-s -w" -o notes-app-linux-amd64 ./cmd/server
 
-      - name: Upload binary to release
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          artifact-name: notes-app-linux-amd64.sbom.spdx.json
+          output-file: notes-app-linux-amd64.sbom.spdx.json
+
+      - name: Attest binary provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: notes-app-linux-amd64
+
+      - name: Upload binary and SBOM to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.tag-and-release.outputs.version }}
-          files: notes-app-linux-amd64
+          files: |
+            notes-app-linux-amd64
+            notes-app-linux-amd64.sbom.spdx.json
 
-  image:
+  release-image:
     needs: tag-and-release
     if: needs.tag-and-release.outputs.version != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    outputs:
+      artifact_registry_image: ${{ steps.tags.outputs.artifact_registry_image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -107,11 +112,43 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # WIF, not a downloaded service-account key - see docs/CLOUD_RUN_CICD_BOOTSTRAP.md.
+      - name: Authenticate to GCP via Workload Identity Federation
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          echo "artifact_registry_image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/notes-app/notes-app:${{ needs.tag-and-release.outputs.version }}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          sbom: true
+          provenance: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ needs.tag-and-release.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
+            ${{ steps.tags.outputs.artifact_registry_image }}
+
+      - name: Attest GHCR image provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

@@ -10,9 +10,9 @@ import (
 
 // OAuthProfile represents user profile data from OAuth providers
 type OAuthProfile struct {
-	ID       string
-	Email    string
-	Name     string
+	ID        string
+	Email     string
+	Name      string
 	AvatarURL string
 }
 
@@ -104,7 +104,7 @@ func (s *AuthService) ValidateUser(userID string) (*models.User, error) {
 	if userID == "" {
 		return nil, nil
 	}
-	
+
 	user, err := s.userRepo.GetUserByID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)

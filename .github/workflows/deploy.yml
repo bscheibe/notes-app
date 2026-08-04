@@ -1,0 +1,62 @@
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # workflow_run doesn't expose the triggering run's job outputs directly,
+      # so the release version tag is fetched from the git tag on the same
+      # commit instead (release.yml always tags vX.Y.Z before building).
+      - name: Resolve release version
+        id: version
+        run: |
+          tag=$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
+          if [ -z "$tag" ]; then
+            echo "No release tag found on ${{ github.event.workflow_run.head_sha }}, skipping deploy."
+            exit 1
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Infrastructure is NOT applied here. The CI/CD identity, its IAM roles,
+      # WIF, and the Artifact Registry repo are one-time setup done by hand
+      # via `gcloud` (see docs/CLOUD_RUN_CICD_BOOTSTRAP.md). The Cloud Run
+      # service itself is managed by Terraform in infra/, applied manually
+      # (`terraform apply`, run by a human) - not by CI, and not via
+      # Infrastructure Manager. This workflow only updates the running
+      # image on an already-existing service.
+      #
+      # Terraform's Cloud Run resource ignores `image` changes after create
+      # (see infra/cloud_run.tf) so each release's image is deployed here
+      # instead - a plain revision update, not a Terraform-managed field.
+      - name: Deploy image to Cloud Run
+        run: |
+          gcloud run deploy notes-app \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/notes-app/notes-app:${{ steps.version.outputs.version }}

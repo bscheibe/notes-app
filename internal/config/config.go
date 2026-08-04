@@ -26,8 +26,8 @@ type Config struct {
 		Format string
 	}
 	Monitoring struct {
-		Enabled bool
-		ServiceName string
+		Enabled        bool
+		ServiceName    string
 		TracingEnabled bool
 	}
 	Auth struct {
@@ -57,7 +57,7 @@ func Load(configFile string) (*Config, error) {
 
 	// Set config file settings
 	v.SetConfigType("yaml")
-	
+
 	if configFile != "" {
 		// Use specific config file if provided
 		v.SetConfigFile(configFile)
@@ -78,7 +78,7 @@ func Load(configFile string) (*Config, error) {
 	v.SetDefault("monitoring.enabled", true)
 	v.SetDefault("monitoring.service_name", "notes-app")
 	v.SetDefault("monitoring.tracing_enabled", true)
-	
+
 	// Auth defaults
 	v.SetDefault("auth.google.client_id", "")
 	v.SetDefault("auth.google.client_secret", "")

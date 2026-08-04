@@ -85,7 +85,7 @@ func TestFileSystemUserRepository_CreateUser(t *testing.T) {
 			Email:    "test2@example.com",
 			Name:     "Another User",
 			Provider: models.ProviderGoogle, // Same provider
-			OAuthID:  "google123",          // Same OAuth ID
+			OAuthID:  "google123",           // Same OAuth ID
 		}
 
 		err = repo.CreateUser(user1)

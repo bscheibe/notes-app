@@ -95,7 +95,7 @@ func TestNoteHandler_HandleViewNote(t *testing.T) {
 		Title:   "Test Note",
 		Content: "Test content",
 	}
-	createdNote, err := handler.service.CreateNote("test-user",createReq)
+	createdNote, err := handler.service.CreateNote("test-user", createReq)
 	require.NoError(t, err)
 
 	t.Run("view existing note", func(t *testing.T) {
@@ -171,7 +171,7 @@ func TestNoteHandler_HandleSaveNote(t *testing.T) {
 			Title:   "Original Note",
 			Content: "Original content",
 		}
-		createdNote, err := handler.service.CreateNote("test-user",createReq)
+		createdNote, err := handler.service.CreateNote("test-user", createReq)
 		require.NoError(t, err)
 
 		// Update the note
@@ -270,6 +270,11 @@ func TestNoteHandler_GetLogger(t *testing.T) {
 }
 
 func TestNewNoteHandler(t *testing.T) {
+	// This test will fail if templates/index.html doesn't exist
+	// For a real test, you'd need to ensure the template file exists
+	// or mock the template parsing
+	t.Skip("Skipping test that requires actual template file")
+
 	tempDir := t.TempDir()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -277,11 +282,6 @@ func TestNewNoteHandler(t *testing.T) {
 	require.NoError(t, err)
 
 	noteService := service.NewNoteService(repo, logger)
-
-	// This test will fail if templates/index.html doesn't exist
-	// For a real test, you'd need to ensure the template file exists
-	// or mock the template parsing
-	t.Skip("Skipping test that requires actual template file")
 
 	handler, err := NewNoteHandler(noteService, logger, nil, nil)
 	if err != nil {
