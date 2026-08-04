@@ -40,6 +40,10 @@ jobs:
     if: needs.tag-and-release.outputs.version != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,11 +64,25 @@ jobs:
         run: |
           go build -trimpath -ldflags="-s -w" -o notes-app-linux-amd64 ./cmd/server
 
-      - name: Upload binary to release
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          artifact-name: notes-app-linux-amd64.sbom.spdx.json
+          output-file: notes-app-linux-amd64.sbom.spdx.json
+
+      - name: Attest binary provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: notes-app-linux-amd64
+
+      - name: Upload binary and SBOM to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.tag-and-release.outputs.version }}
-          files: notes-app-linux-amd64
+          files: |
+            notes-app-linux-amd64
+            notes-app-linux-amd64.sbom.spdx.json
 
   release-image:
     needs: tag-and-release
@@ -74,6 +92,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      attestations: write
       id-token: write
     outputs:
       artifact_registry_image: ${{ steps.tags.outputs.artifact_registry_image }}
@@ -115,11 +134,21 @@ jobs:
           echo "artifact_registry_image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/notes-app/notes-app:${{ needs.tag-and-release.outputs.version }}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          sbom: true
+          provenance: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ needs.tag-and-release.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
             ${{ steps.tags.outputs.artifact_registry_image }}
+
+      - name: Attest GHCR image provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
