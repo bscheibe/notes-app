@@ -270,10 +270,8 @@ Potential improvements for production deployment:
 - Add database integration (PostgreSQL, etc.)
 - Add API versioning
 - Add rate limiting
-- Add containerization (Docker)
-- Add CI/CD pipeline
 - Add more E2E test coverage for authentication flows
 
 ## License
 
-MIT License
+[MIT](LICENSE)

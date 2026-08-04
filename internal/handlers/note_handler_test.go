@@ -270,26 +270,8 @@ func TestNoteHandler_GetLogger(t *testing.T) {
 }
 
 func TestNewNoteHandler(t *testing.T) {
-	tempDir := t.TempDir()
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-
-	repo, err := repository.NewNoteRepository(tempDir, logger)
-	require.NoError(t, err)
-
-	noteService := service.NewNoteService(repo, logger)
-
-	// This test will fail if templates/index.html doesn't exist
+	// This test requires templates/index.html to exist to construct a handler.
 	// For a real test, you'd need to ensure the template file exists
-	// or mock the template parsing
+	// or mock the template parsing.
 	t.Skip("Skipping test that requires actual template file")
-
-	handler, err := NewNoteHandler(noteService, logger, nil, nil)
-	if err != nil {
-		t.Skip("Template file not found, skipping")
-	}
-
-	require.NoError(t, err)
-	require.NotNil(t, handler)
-	assert.Equal(t, noteService, handler.service)
-	assert.Equal(t, logger, handler.logger)
 }

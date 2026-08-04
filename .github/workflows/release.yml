@@ -5,8 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   build-and-test:
@@ -28,6 +27,11 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
       - name: Test
         run: go test ./... -race -shuffle=on
 
@@ -40,6 +44,8 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.release.outputs.version }}
     steps:
@@ -60,6 +66,10 @@ jobs:
     if: needs.tag-and-release.outputs.version != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -80,17 +90,35 @@ jobs:
         run: |
           go build -trimpath -ldflags="-s -w" -o notes-app-linux-amd64 ./cmd/server
 
-      - name: Upload binary to release
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          artifact-name: notes-app-linux-amd64.sbom.spdx.json
+          output-file: notes-app-linux-amd64.sbom.spdx.json
+
+      - name: Attest binary provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: notes-app-linux-amd64
+
+      - name: Upload binary and SBOM to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.tag-and-release.outputs.version }}
-          files: notes-app-linux-amd64
+          files: |
+            notes-app-linux-amd64
+            notes-app-linux-amd64.sbom.spdx.json
 
   image:
     needs: tag-and-release
     if: needs.tag-and-release.outputs.version != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      packages: write
+      attestations: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -108,10 +136,20 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          sbom: true
+          provenance: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ needs.tag-and-release.outputs.version }}
             ghcr.io/${{ github.repository }}:latest
+
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

@@ -51,8 +51,11 @@ func main() {
 	// Clean up temp directory on shutdown
 	defer func() {
 		if filepath.Base(cfg.Notes.Directory)[:8] == "notes-app" {
-			os.RemoveAll(cfg.Notes.Directory)
-			slog.Info("Cleaned up temporary notes directory", "directory", cfg.Notes.Directory)
+			if err := os.RemoveAll(cfg.Notes.Directory); err != nil {
+				slog.Error("Failed to clean up temporary notes directory", "directory", cfg.Notes.Directory, "error", err)
+			} else {
+				slog.Info("Cleaned up temporary notes directory", "directory", cfg.Notes.Directory)
+			}
 		}
 	}()
 

@@ -102,10 +102,12 @@ func New(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 
 	// Setup router
 	r := chi.NewRouter()
+	// One trusted hop: GCP's load balancer / Cloud Run front door appends the
+	// real client IP as the last entry in X-Forwarded-For.
+	r.Use(chiMiddleware.ClientIPFromXFFTrustedProxies(1))
 	r.Use(chiMiddleware.Logger)
 	r.Use(chiMiddleware.Recoverer)
 	r.Use(chiMiddleware.RequestID)
-	r.Use(chiMiddleware.RealIP)
 	r.Use(chiMiddleware.Timeout(60 * time.Second))
 
 	// Setup routes

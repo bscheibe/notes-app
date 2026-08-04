@@ -411,7 +411,7 @@ func TestAuthHandlerIntegration_RouteProtection(t *testing.T) {
 			}
 			
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("Protected content"))
+			_, _ = w.Write([]byte("Protected content"))
 		})
 		
 		// Test without authentication
