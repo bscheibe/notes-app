@@ -851,6 +851,17 @@ sweep, and the API's behavior depends on sweeper timing.
 
 Dropping the guest feature was offered as an option. Here is the assessment.
 
+> **Superseded by a better option.** This section recommends making anonymous
+> users read-only, treating "guest access" and "abuse safety" as a tradeoff.
+> That turned out to be a false choice: storing guest notes **client-side** in
+> the browser keeps the guest feature fully intact *and* removes anonymous
+> server storage entirely. See
+> [NO_ANONYMOUS_SERVER_ACCESS.md](NO_ANONYMOUS_SERVER_ACCESS.md) and
+> [notes-webpage's local-first design](https://github.com/bscheibe/notes-webpage/blob/main/docs/LOCAL_FIRST_GUEST_STORAGE.md).
+> The reasoning below still holds for *why* anonymous server storage is
+> untenable — it is the analysis that motivated the client-side approach — but
+> the recommendation itself is no longer the preferred path.
+
 **Recommendation: keep anonymous access for reading, require a federated
 identity (Google/GitHub) for writing.**
 
