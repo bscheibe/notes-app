@@ -72,7 +72,7 @@ jobs:
           output-file: notes-app-linux-amd64.sbom.spdx.json
 
       - name: Attest binary provenance
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: notes-app-linux-amd64
 
@@ -147,7 +147,7 @@ jobs:
             ${{ steps.tags.outputs.artifact_registry_image }}
 
       - name: Attest GHCR image provenance
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
