@@ -25,23 +25,34 @@ jobs:
       # workflow_run doesn't expose the triggering run's job outputs directly,
       # so the release version tag is fetched from the git tag on the same
       # commit instead (release.yml always tags vX.Y.Z before building).
+      #
+      # A missing tag is not an error here: go-semantic-release legitimately
+      # creates no tag (and release.yml's release-binary/release-image jobs
+      # skip) when the commits since the last release don't warrant a
+      # version bump, e.g. a docs-only change. release.yml still reports
+      # success in that case, which is what triggers this workflow - so
+      # treat "no tag" as "nothing to deploy" and exit 0, not exit 1.
       - name: Resolve release version
         id: version
         run: |
           tag=$(git tag --points-at "${{ github.event.workflow_run.head_sha }}" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
           if [ -z "$tag" ]; then
-            echo "No release tag found on ${{ github.event.workflow_run.head_sha }}, skipping deploy."
-            exit 1
+            echo "No release tag found on ${{ github.event.workflow_run.head_sha }}, nothing to deploy."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
       - name: Authenticate to GCP via Workload Identity Federation
+        if: steps.version.outputs.found == 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
+        if: steps.version.outputs.found == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
       # Infrastructure is NOT applied here. The CI/CD identity, its IAM roles,
@@ -56,6 +67,7 @@ jobs:
       # (see infra/cloud_run.tf) so each release's image is deployed here
       # instead - a plain revision update, not a Terraform-managed field.
       - name: Deploy image to Cloud Run
+        if: steps.version.outputs.found == 'true'
         run: |
           gcloud run deploy notes-app \
             --project=${{ secrets.GCP_PROJECT_ID }} \
