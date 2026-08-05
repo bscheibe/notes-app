@@ -47,14 +47,14 @@ func New(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 
 	// Initialize authentication components
 	authDir := filepath.Join(cfg.Notes.Directory, "auth")
-	
+
 	userRepo, err := auth.NewFileSystemUserRepository(filepath.Join(authDir, "users"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user repository: %w", err)
 	}
 
 	authService := auth.NewAuthService(userRepo, cfg)
-	
+
 	// Register OAuth clients if credentials are provided
 	oauthClients := auth.NewOAuthClients(cfg)
 	for provider, client := range oauthClients {
@@ -105,7 +105,10 @@ func New(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 	r.Use(chiMiddleware.Logger)
 	r.Use(chiMiddleware.Recoverer)
 	r.Use(chiMiddleware.RequestID)
-	r.Use(chiMiddleware.RealIP)
+	// RealIP deliberately not used: it trusts X-Forwarded-For/X-Real-IP
+	// unconditionally, letting any client spoof the logged IP (see
+	// GHSA-3fxj-6jh8-hvhx). Nothing in this app reads RemoteAddr for
+	// access control, so request logs use the actual TCP peer instead.
 	r.Use(chiMiddleware.Timeout(60 * time.Second))
 
 	// Setup routes
@@ -152,7 +155,7 @@ func setupRoutes(r *chi.Mux, handler *handlers.NoteHandler, authHandler *handler
 
 	// Application routes with optional auth
 	r.With(authMiddleware.OptionalAuth).Get("/", handler.HandleHome)
-	
+
 	// Protected routes requiring authentication
 	r.With(authMiddleware.OptionalAuth).Route("/notes", func(r chi.Router) {
 		r.Post("/", handler.HandleSaveNote)
@@ -163,7 +166,7 @@ func setupRoutes(r *chi.Mux, handler *handlers.NoteHandler, authHandler *handler
 // Start begins the HTTP server
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%s", s.config.Server.Host, s.config.Server.Port)
-	
+
 	s.server = &http.Server{
 		Addr:         addr,
 		Handler:      s.router,
@@ -173,7 +176,7 @@ func (s *Server) Start() error {
 	}
 
 	s.logger.Info("Server starting", "address", addr, "notes_dir", s.config.Notes.Directory)
-	
+
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server error: %w", err)
 	}
@@ -193,10 +196,10 @@ func (s *Server) Shutdown(timeout time.Duration) error {
 			s.logger.Error("Failed to shutdown tracer", "error", err)
 		}
 	}
-	
+
 	if s.server != nil {
 		return s.server.Close()
 	}
-	
+
 	return nil
 }

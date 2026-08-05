@@ -276,4 +276,4 @@ Potential improvements for production deployment:
 
 ## License
 
-MIT License
+[MIT](LICENSE)

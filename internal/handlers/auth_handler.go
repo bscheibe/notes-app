@@ -58,7 +58,7 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to load template", http.StatusInternalServerError)
 		return
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	err = tmpl.Execute(w, nil)
 	if err != nil {
@@ -208,7 +208,7 @@ func (h *AuthHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 		// If session decoding fails, create a new session to clear cookie
 		session, _ = h.store.New(r, h.sessionName)
 		session.Options.MaxAge = -1 // Delete cookie
-		session.Save(r, w)
+		_ = session.Save(r, w)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}

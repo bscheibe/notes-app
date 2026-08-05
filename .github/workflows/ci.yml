@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -12,7 +13,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -23,11 +24,45 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Test
+        run: go test ./... -race -shuffle=on
+
+  # Non-functional checks (formatting, static analysis, vulnerability scan) -
+  # split from build-and-test so they show as their own PR check, and run in
+  # parallel with it rather than after, since neither depends on the other's
+  # output.
+  quality-scans:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify module checksums
+        run: go mod verify
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
       - name: Vet
         run: go vet ./...
 
-      - name: Test
-        run: go test ./... -race -shuffle=on
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
 
       - name: Vulnerability scan
         run: |

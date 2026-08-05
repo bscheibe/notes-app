@@ -41,3 +41,12 @@ playwright-report/
 test-results/
 playwright/.cache/
 dist/
+
+# Terraform - infra/ is applied manually by a human (`terraform apply`),
+# never by CI. State is local; the plugin cache and state files are
+# ignored, but .terraform.lock.hcl is intentionally committed (standard
+# Terraform practice) so provider versions are reproducible.
+infra/.terraform/
+infra/terraform.tfstate*
+infra/*.tfplan
+infra/*.tfvars

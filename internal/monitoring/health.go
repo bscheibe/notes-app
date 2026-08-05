@@ -9,10 +9,10 @@ import (
 
 // HealthStatus represents the health status of the application
 type HealthStatus struct {
-	Status    string            `json:"status"`
-	Timestamp time.Time         `json:"timestamp"`
-	Version   string            `json:"version"`
-	Checks    map[string]Check  `json:"checks,omitempty"`
+	Status    string           `json:"status"`
+	Timestamp time.Time        `json:"timestamp"`
+	Version   string           `json:"version"`
+	Checks    map[string]Check `json:"checks,omitempty"`
 }
 
 // Check represents a single health check
@@ -57,7 +57,7 @@ func (h *HealthChecker) CheckHealth() HealthStatus {
 	for name, checkFunc := range h.checks {
 		check := checkFunc()
 		status.Checks[name] = check
-		
+
 		if check.Status != "healthy" {
 			allHealthy = false
 		}
@@ -74,16 +74,16 @@ func (h *HealthChecker) CheckHealth() HealthStatus {
 func (h *HealthChecker) HandleHealth() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := h.CheckHealth()
-		
+
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		if status.Status == "healthy" {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
-		
-		json.NewEncoder(w).Encode(status)
+
+		_ = json.NewEncoder(w).Encode(status)
 	}
 }
 
@@ -91,15 +91,15 @@ func (h *HealthChecker) HandleHealth() http.HandlerFunc {
 func (h *HealthChecker) HandleReadiness() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status := h.CheckHealth()
-		
+
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		if status.Status == "healthy" {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
+			_, _ = w.Write([]byte("OK"))
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("Not Ready"))
+			_, _ = w.Write([]byte("Not Ready"))
 		}
 	}
 }
@@ -109,6 +109,6 @@ func (h *HealthChecker) HandleLiveness() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	}
 }
