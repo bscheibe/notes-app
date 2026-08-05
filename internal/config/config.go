@@ -98,6 +98,12 @@ func Load(configFile string) (*Config, error) {
 	v.SetEnvPrefix("NOTES_APP")
 	v.AutomaticEnv()
 
+	// Cloud Run (and App Engine, Heroku, etc.) injects the listen port via
+	// the bare PORT env var rather than NOTES_APP_SERVER_PORT.
+	if port := os.Getenv("PORT"); port != "" {
+		v.Set("server.port", port)
+	}
+
 	// Read config file (if exists)
 	if err := v.ReadInConfig(); err != nil {
 		// If config file not found, we'll use defaults
