@@ -19,6 +19,14 @@ func TestLoad(t *testing.T) {
 		assert.NotEmpty(t, cfg.Notes.Directory)
 	})
 
+	t.Run("PORT env var overrides server port", func(t *testing.T) {
+		t.Setenv("PORT", "9090")
+
+		cfg, err := Load("")
+		require.NoError(t, err)
+		assert.Equal(t, "9090", cfg.Server.Port)
+	})
+
 	t.Run("generates random cookie secret", func(t *testing.T) {
 		cfg1, err := Load("")
 		require.NoError(t, err)

@@ -2,6 +2,9 @@
 # This file contains environment-specific settings for production deployment
 # Secrets should be passed via environment variables, not committed to this file
 
+server:
+  host: "0.0.0.0"  # must bind on all interfaces for Cloud Run's health check to reach it
+
 notes:
   directory: "/var/lib/notes-app"
 
