@@ -23,8 +23,6 @@ Detailed implementation plan for authentication features:
 ### [Integration Testing](INTEGRATION_TESTING.md)
 Complete guide to testing strategies and implementation:
 - Go unit and integration testing with Testify
-- E2E testing with Playwright
-- Page Object Model pattern
 - Test configuration and setup
 - Best practices for maintainable tests
 

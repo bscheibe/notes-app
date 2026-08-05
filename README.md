@@ -2,6 +2,10 @@
 
 A production-grade Go web application for creating and managing markdown notes.
 
+The frontend lives in a separate repo:
+[notes-webpage](https://github.com/bscheibe/notes-webpage), a static site on
+Firebase Hosting that calls this service as a JSON API.
+
 ## Project Structure
 
 This project follows idiomatic Go project layout and architecture patterns:
@@ -23,17 +27,10 @@ notes-app/
 │   ├── repository/          # Data access layer
 │   ├── server/              # Server setup and routing
 │   └── service/             # Business logic layer
-├── templates/             # HTML templates
-├── tests/                 # E2E tests with Playwright
-│   ├── e2e/                 # E2E test specifications
-│   ├── pages/                # Page Object Model classes
-│   └── fixtures/             # Test data and configuration
 ├── config.prod.yaml       # Production configuration
 ├── config.staging.yaml    # Staging configuration
 ├── Dockerfile
 ├── go.mod                 # Go module file
-├── package.json           # Node.js dependencies for E2E tests
-├── playwright.config.ts   # Playwright configuration
 └── README.md              # This file
 ```
 
@@ -57,8 +54,6 @@ Detailed documentation is available in [`docs/`](docs/README.md), covering authe
 
 - Go 1.26 or higher
 - Make (optional, for build scripts)
-- Node.js 18+ (for E2E testing)
-- npm or yarn (for E2E testing)
 
 ### Installation
 
@@ -142,7 +137,6 @@ The server will start on `http://localhost:8080` (or configured port)
 - **service/**: Business logic (can be tested independently of HTTP)
 - **handlers/**: HTTP request/response handling
 - **config/**: Configuration management
-- **tests/**: E2E tests using Playwright for full user flow testing
 
 ### Key Design Decisions
 
@@ -163,8 +157,7 @@ The server will start on `http://localhost:8080` (or configured port)
 
 ### Testing
 
-#### Unit Tests
-Run Go unit tests:
+Run Go unit and integration tests:
 ```bash
 go test ./...
 ```
@@ -174,28 +167,8 @@ Run tests with coverage:
 go test -cover ./...
 ```
 
-#### E2E Tests with Playwright
-The project includes end-to-end tests using Playwright to test the full user flow. For detailed information about E2E testing setup, structure, and best practices, see the [Integration Testing documentation](docs/INTEGRATION_TESTING.md).
-
-**Quick Start:**
-```bash
-# Install dependencies
-npm install
-
-# Install Playwright browsers
-npm run test:e2e:install
-
-# Run all E2E tests (headless)
-npm run test:e2e
-
-# Run tests with visible browser
-npm run test:e2e:headed
-
-# Debug tests
-npm run test:e2e:debug
-```
-
-The E2E tests automatically start the Go server, run the tests, and clean up.
+For detailed information about the testing approach, see the
+[Integration Testing documentation](docs/INTEGRATION_TESTING.md).
 
 ## Production Considerations
 
@@ -261,7 +234,6 @@ Potential improvements for production deployment:
 - Add database integration (PostgreSQL, etc.)
 - Add API versioning
 - Add rate limiting
-- Add more E2E test coverage for authentication flows
 
 ## License
 

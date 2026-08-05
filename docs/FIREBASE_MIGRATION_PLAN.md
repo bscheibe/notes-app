@@ -15,6 +15,18 @@ hosting/auth to Firebase:
 depends on the Go API rewrite described here, which has not been implemented
 yet. This document is the plan for that remaining work.
 
+A small piece of file-by-file disposition below has already landed ahead of
+the rest, as a standalone cleanup rather than part of the auth rewrite:
+`templates/` has moved to `notes-webpage`, and `note_handler.go` returns JSON
+instead of rendering HTML. **None of the actual auth migration has
+happened** — `internal/auth/`, `internal/middleware/auth_middleware.go`,
+`internal/handlers/auth_handler.go`, and `models.User`/`GuestSession`/
+`Identity`/`Provider` are all still in place and still working exactly as
+described below, and the JSON responses from `note_handler.go` are not yet
+the `/api/*` surface this document specifies (no route prefix, no Firebase
+token verification, no CORS). See the note on `note_handler.go` in the
+disposition table.
+
 ## Why
 
 The current app has no client-side JavaScript and no JSON API. Every page is
@@ -30,10 +42,12 @@ token instead of a cookie.
 
 ## Current state (as of this document)
 
-- One Go repo (`notes-app`) does routing, HTML rendering, OAuth, sessions, and
-  note storage.
-- `internal/handlers/note_handler.go` renders `templates/index.html` via
-  `html/template`, driven by HTML `<form>` POSTs to `/notes/`.
+- One Go repo (`notes-app`) does routing, OAuth, sessions, and note storage.
+- `internal/handlers/note_handler.go` returns JSON, driven by the same
+  `<form>`-style POST body (`title`/`content`/`original_filename`) as before —
+  this is not yet the `/api/*` surface below; it's an interim state ahead of
+  the actual rewrite (no route prefix, no Firebase token verification, no
+  `DELETE`, no `PageData`/`html/template` since `templates/` moved out).
 - `internal/handlers/auth_handler.go` + `internal/auth/` handle OAuth
   initiation/callback, guest sessions, and login/logout, backed by
   `gorilla/sessions` cookies and a filesystem-backed user repository.
@@ -130,19 +144,21 @@ Planned structure: a new `internal/firebaseauth/` package replacing
   (`auth_handler_test.go`, `auth_handler_integration_test.go`).
 - `internal/middleware/auth_middleware.go` and `auth_middleware_test.go`.
 - `internal/models/user.go` (`User`, `GuestSession`, `Identity`, `Provider`).
-- `templates/` (`index.html`, `login.html`) — the HTML now lives in
-  `notes-webpage`.
 
-**Rewrite:**
-- `internal/handlers/note_handler.go` — drop `html/template`, `PageData`,
-  `UserInfo`; become JSON handlers (list/get/create/update/delete) using
-  `encoding/json`.
+**Already done, ahead of the rest of this plan:**
+- `templates/` (`index.html`, `login.html`) — moved to `notes-webpage`.
+- `internal/handlers/note_handler.go` — dropped `html/template`, `PageData`,
+  `UserInfo`; handlers now use `encoding/json`. Still missing from this task:
+  the `/api/*` route prefix, `DELETE`, and Firebase token verification — those
+  land with the rest of this plan, below.
+- `internal/server/server.go` — dropped the `/static/*` file server (it
+  served no directory that existed in this repo).
+
+**Rewrite (remaining):**
 - `internal/server/server.go` — drop auth handler/service/user-repo wiring;
   mount CORS; mount the new `firebaseauth.RequireAuth` middleware; replace the
-  route table with the `/api/*` tree above; drop the `/` HTML route and the
-  `/static/*` file server (note: `static/` doesn't currently exist as a
-  directory in this repo, so that route is already dead code — this is a good
-  opportunity to remove it).
+  route table with the `/api/*` tree above; drop the `/` route in favor of
+  `/api/notes`.
 - `internal/config/config.go` — remove the entire `Auth` struct
   (`Google`/`GitHub`/`Session`/`GuestSessionDuration`) and
   `GetSessionDuration`/`GetGuestSessionDuration`/`generateRandomSecret`; add:
@@ -204,37 +220,47 @@ This document only covers planning — the following is the recommended order
 for the actual implementation work, kept separate so the API rewrite can be
 reviewed on its own:
 
-1. Add `firebase.google.com/go/v4` + `github.com/go-chi/cors` to `go.mod`;
+1. ~~Rewrite `note_handler.go` to JSON.~~ Done, ahead of the rest of this
+   plan — see the disposition table above. Still owes this plan the
+   `/api/*` prefix and the new `DELETE` route, picked up in step 5 below.
+2. ~~Move the Playwright suite into `notes-webpage`; drop `templates/` and
+   the Playwright/TS tooling (`playwright.config.ts`, `tsconfig.json`,
+   `package.json`) from `notes-app`.~~ Done, ahead of the rest of this plan.
+   The suite still drives the old form-POST flow against `notes-webpage`'s
+   reference copy; rewriting it to drive the SPA plus the Firebase Auth
+   Emulator (per the Test migration section above) is still outstanding.
+3. Add `firebase.google.com/go/v4` + `github.com/go-chi/cors` to `go.mod`;
    remove `oauth2`/`gorilla/sessions`.
-2. Add `Firebase`/`CORS` config fields; update the three `config.*.yaml`
+4. Add `Firebase`/`CORS` config fields; update the three `config.*.yaml`
    files with a real (or placeholder) shared project ID.
-3. Build `internal/firebaseauth/` (verifier + middleware + context helpers)
+5. Build `internal/firebaseauth/` (verifier + middleware + context helpers)
    with unit tests against an injectable `TokenVerifier`.
-4. Rewrite `note_handler.go` to JSON; wire the new `DELETE` route.
-5. Rewrite `server.go`: drop old auth wiring, mount CORS + `RequireAuth`,
-   register `/api/*` routes, drop `/`, `/static/*`, and the `templates`
-   dependency.
-6. Delete `internal/auth/`, `internal/handlers/auth_handler*.go`,
-   `internal/middleware/auth_middleware*.go`, `internal/models/user.go`,
-   `templates/`.
-7. Write/port Go API integration tests; confirm `go build ./...` and
+6. Finish `note_handler.go`: add the `/api/*` prefix and wire the new
+   `DELETE` route.
+7. Rewrite `server.go`: drop old auth wiring, mount CORS + `RequireAuth`,
+   register `/api/*` routes.
+8. Delete `internal/auth/`, `internal/handlers/auth_handler*.go`,
+   `internal/middleware/auth_middleware*.go`, `internal/models/user.go`.
+9. Write/port Go API integration tests; confirm `go build ./...` and
    `go test ./...` are green.
-8. Manually verify the API against a real Firebase ID token (e.g. via a
-   scratch HTML page hitting the Auth JS SDK, or `firebase auth:sign-in`) to
-   confirm token verification works end-to-end, not just against mocks.
-9. Point `notes-webpage/js/firebase-config.js` at the real Firebase project
-   and confirm `js/api.js`/`js/auth.js` work against the live API locally.
-10. Move and rewrite the Playwright suite into `notes-webpage` per the Test
-    migration section above; delete the originals (and unused `package.json`
-    entries) from `notes-app` once the new suite passes.
-11. Final cleanup: grep for leftover references to `templates/`,
-    `models.User`, `models.Provider`, `models.GuestSession`, `models.Identity`
-    across the repo, and confirm `go.mod`/`go.sum` have no unused deps.
+10. Manually verify the API against a real Firebase ID token (e.g. via a
+    scratch HTML page hitting the Auth JS SDK, or `firebase auth:sign-in`) to
+    confirm token verification works end-to-end, not just against mocks.
+11. Point `notes-webpage/js/firebase-config.js` at the real Firebase project
+    and confirm `js/api.js`/`js/auth.js` work against the live API locally.
+12. Finish rewriting the Playwright suite (from step 2) against the live
+    `/api/*` surface and the Firebase Auth Emulator.
+13. Final cleanup: grep for leftover references to `models.User`,
+    `models.Provider`, `models.GuestSession`, `models.Identity` across the
+    repo, and confirm `go.mod`/`go.sum` have no unused deps.
 
 ## Explicitly out of scope for the current round
 
 The `notes-webpage` scaffold and this document were produced without making
-any of the Go changes above. `note_handler.go` still serves HTML today;
-`internal/auth/` and `internal/middleware/auth_middleware.go` still exist and
-still work as before. The goal of this round was two repos in place and an
-unambiguous plan for the remaining work — not the API rewrite itself.
+any of the Go auth changes above. `internal/auth/` and
+`internal/middleware/auth_middleware.go` still exist and still work as
+before — OAuth, cookie sessions, and guest sessions are all still live. The
+goal of this round was two repos in place and an unambiguous plan for the
+remaining work, not the auth rewrite itself. The `templates/` move and the
+`note_handler.go` JSON conversion happened as a standalone prune (see the
+disposition table above), not as part of executing this plan.

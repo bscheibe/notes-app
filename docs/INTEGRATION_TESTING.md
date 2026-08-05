@@ -288,17 +288,15 @@ req.AddCookie(sessionCookie)
 5. ✅ Error handling
 
 ### Important Paths (Medium Priority)
-1. ✅ Static file serving
-2. ✅ Health endpoints
-3. ✅ Middleware chain
-4. ✅ Concurrent request handling
-5. ✅ Configuration validation
+1. ✅ Health endpoints
+2. ✅ Middleware chain
+3. ✅ Concurrent request handling
+4. ✅ Configuration validation
 
 ### Nice to Have (Lower Priority)
 1. Performance testing
 2. Load testing
 3. Integration with external services
-4. End-to-end UI testing
 
 ## Running Integration Tests
 
@@ -327,167 +325,6 @@ go test ./... -cover -run Integration
 Integration tests run as part of the standard `go test ./... -race -shuffle=on`
 step in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) - there's no
 separate CI job for them.
-
-## End-to-End Testing with Playwright
-
-### Overview
-
-The Notes App includes end-to-end (E2E) tests using Playwright to test the complete user journey through the web interface. These tests complement the Go integration tests by testing the actual browser interactions.
-
-### Framework Choice: Playwright
-
-**Why Playwright:**
-- Modern, fast, and reliable E2E testing
-- Cross-browser support (Chromium, Firefox, WebKit)
-- Auto-waiting for elements (reduces flakiness)
-- Built-in test runner and reporter
-- TypeScript support for better type safety
-- Excellent documentation and community support
-
-### Setup
-
-**Install Dependencies:**
-```bash
-npm install
-npm run test:e2e:install
-```
-
-**Configuration:**
-- `playwright.config.ts` - Main configuration file
-- `tsconfig.json` - TypeScript configuration
-- `package.json` - Node.js dependencies and scripts
-
-### Test Structure
-
-```
-tests/
-├── e2e/              # E2E test specifications
-│   ├── note-save.spec.ts
-│   └── guest-isolation.spec.ts
-├── pages/            # Page Object Model classes
-│   ├── BasePage.ts
-│   └── HomePage.ts
-├── fixtures/         # Test data and configuration
-│   └── test-config.ts
-├── global-setup.ts
-└── global-teardown.ts
-```
-
-### Page Object Model
-
-The tests use the Page Object Model pattern for maintainable test code:
-
-**BasePage Class:**
-```typescript
-export class BasePage {
-  readonly page: Page;
-
-  constructor(page: Page) {
-    this.page = page;
-  }
-
-  async goto(url: string = '/') {
-    await this.page.goto(url);
-  }
-
-  async fill(selector: string, value: string) {
-    await this.page.fill(selector, value);
-  }
-
-  async click(selector: string) {
-    await this.page.click(selector);
-  }
-}
-```
-
-**HomePage Class:**
-```typescript
-export class HomePage extends BasePage {
-  readonly titleInput = 'input[name="title"]';
-  readonly contentTextarea = 'textarea[name="content"]';
-  readonly saveButton = 'button[type="submit"]';
-
-  async createNote(title: string, content: string) {
-    await this.fill(this.titleInput, title);
-    await this.fill(this.contentTextarea, content);
-    await this.click(this.saveButton);
-  }
-
-  async assertNoteCreated(title: string) {
-    // Verification logic
-  }
-}
-```
-
-### Example E2E Test
-
-```typescript
-import { test, expect } from '@playwright/test';
-import { HomePage } from '../pages/HomePage';
-
-test.describe('Note Save Flow', () => {
-  test('should save a new note with title and content', async ({ page }) => {
-    const homePage = new HomePage(page);
-    await homePage.goto();
-
-    await homePage.createNote('Test Note', 'Test content');
-    await homePage.assertNoteCreated('Test Note');
-  });
-});
-```
-
-### Running E2E Tests
-
-**Run all tests:**
-```bash
-npm run test:e2e
-```
-
-**Run with visible browser:**
-```bash
-npm run test:e2e:headed
-```
-
-**Debug tests:**
-```bash
-npm run test:e2e:debug
-```
-
-**Run specific test file:**
-```bash
-npx playwright test tests/e2e/note-save.spec.ts
-```
-
-### Features
-
-**Automatic Server Management:**
-- Playwright config automatically starts the Go server
-- Server runs on `http://localhost:8080`
-- Automatic cleanup after tests complete
-
-**Cross-Browser Testing:**
-- Tests run on Chromium, Firefox, and WebKit
-- Configured in `playwright.config.ts` projects
-
-**Test Reporting:**
-- HTML reporter for detailed results
-- Screenshots on failure
-- Trace files for debugging
-
-**Test Isolation:**
-- Each test runs in isolation
-- Guest sessions are isolated per test
-- Temporary directories for test data
-
-### Best Practices for E2E Tests
-
-1. **Use Page Object Model**: Maintainable and reusable test code
-2. **Wait for Elements**: Use Playwright's auto-waiting features
-3. **Test Real User Flows**: Focus on actual user journeys
-4. **Keep Tests Independent**: Each test should run independently
-5. **Use Meaningful Test Names**: Describe what is being tested
-6. **Clean Up Test Data**: Ensure tests don't leave artifacts
-7. **Test Edge Cases**: Include error scenarios and validation
 
 ## Go Integration Testing Best Practices
 
@@ -537,23 +374,20 @@ assert.Equal(t, http.StatusOK, resp.StatusCode)
 1. **No External Service Mocking**: OAuth providers not mocked
 2. **No Database Testing**: File-based storage only
 3. **No Performance Testing**: No load or stress testing
-4. **No Browser Automation**: No UI testing
 
 ### Future Improvements
 1. **Add OAuth Mocking**: Mock OAuth provider responses
 2. **Add Database Tests**: Test with real database in CI
 3. **Add Performance Tests**: Benchmark critical paths
-4. **Add E2E Tests**: Browser automation with Playwright/Cypress
-5. **Add Chaos Testing**: Test failure scenarios
+4. **Add Chaos Testing**: Test failure scenarios
 
 ## Comparison with Alternatives
 
 ### Why Not Use Full E2E Framework?
 
-**Playwright/Cypress:**
-- Pros: Real browser testing, JavaScript execution
-- Cons: Overkill for API testing, complex setup
-- Decision: Keep for future UI testing needs
+Browser-driven end-to-end testing lives with the frontend, in
+[notes-webpage](https://github.com/bscheibe/notes-webpage) - this repo is a
+JSON API with no UI to drive.
 
 **Postman/Newman:**
 - Pros: API testing, collection management
@@ -571,4 +405,4 @@ assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 Our integration testing approach leverages Go's excellent stdlib support along with Testify for assertions. We focus on testing the highest-leverage functionality - authentication flows, security features, and core user interactions. The tests are designed to be fast, reliable, and maintainable while providing confidence that the application works correctly as an integrated system.
 
-The chosen approach balances thoroughness with practicality, ensuring critical paths are well-tested without over-engineering the test suite. As the application grows, we can expand coverage to include performance testing, external service mocking, and eventually end-to-end UI testing.
+The chosen approach balances thoroughness with practicality, ensuring critical paths are well-tested without over-engineering the test suite. As the application grows, we can expand coverage to include performance testing and external service mocking.
