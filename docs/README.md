@@ -27,7 +27,6 @@ Complete guide to testing strategies and implementation:
 - Page Object Model pattern
 - Test configuration and setup
 - Best practices for maintainable tests
-- CI/CD integration examples
 
 ### [Firebase Migration Plan](FIREBASE_MIGRATION_PLAN.md)
 Plan for splitting the website into a separate `notes-webpage` repo hosted on

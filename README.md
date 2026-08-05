@@ -10,36 +10,31 @@ This project follows idiomatic Go project layout and architecture patterns:
 notes-app/
 ├── cmd/
 │   └── server/
-│       └── main.go          # Application entry point
-├── docs/                    # Documentation
-│   ├── AUTHENTICATION_ARCHITECTURE.md
-│   ├── AUTHENTICATION_IMPLEMENTATION_PLAN.md
-│   └── INTEGRATION_TESTING.md
+│       └── main.go        # Application entry point
+├── docs/                  # Documentation (see docs/README.md for index)
+├── infra/                 # Terraform-managed Cloud Run infrastructure
 ├── internal/
+│   ├── auth/               # OAuth clients, auth service, user repository
 │   ├── config/              # Configuration management
-│   │   └── config.go
 │   ├── handlers/            # HTTP handlers
-│   │   └── note_handler.go
+│   ├── middleware/          # Auth middleware
 │   ├── models/              # Data models
-│   │   └── note.go
+│   ├── monitoring/          # Metrics, tracing, health checks
 │   ├── repository/          # Data access layer
-│   │   └── note_repository.go
 │   ├── server/              # Server setup and routing
-│   │   └── server.go
 │   └── service/             # Business logic layer
-│       └── note_service.go
-├── templates/
-│   └── index.html           # HTML templates
-├── tests/                   # E2E tests with Playwright
+├── templates/             # HTML templates
+├── tests/                 # E2E tests with Playwright
 │   ├── e2e/                 # E2E test specifications
-│   ├── pages/               # Page Object Model classes
-│   └── fixtures/            # Test data and configuration
-├── config.prod.yaml         # Production configuration
-├── config.staging.yaml      # Staging configuration
-├── go.mod                   # Go module file
-├── package.json             # Node.js dependencies for E2E tests
-├── playwright.config.ts      # Playwright configuration
-└── README.md                # This file
+│   ├── pages/                # Page Object Model classes
+│   └── fixtures/             # Test data and configuration
+├── config.prod.yaml       # Production configuration
+├── config.staging.yaml    # Staging configuration
+├── Dockerfile
+├── go.mod                 # Go module file
+├── package.json           # Node.js dependencies for E2E tests
+├── playwright.config.ts   # Playwright configuration
+└── README.md              # This file
 ```
 
 ## Architecture
@@ -54,17 +49,13 @@ The application follows a clean architecture pattern with clear separation of co
 
 ## Documentation
 
-Detailed documentation is available in the `docs/` directory:
-
-- **[Authentication Architecture](docs/AUTHENTICATION_ARCHITECTURE.md)** - Overview of the authentication system design, including OAuth integration, session management, and security considerations
-- **[Authentication Implementation Plan](docs/AUTHENTICATION_IMPLEMENTATION_PLAN.md)** - Detailed implementation plan for authentication features, including OAuth providers, user management, and guest sessions
-- **[Integration Testing](docs/INTEGRATION_TESTING.md)** - Comprehensive guide to testing strategies, including Go unit/integration tests and Playwright E2E tests
+Detailed documentation is available in [`docs/`](docs/README.md), covering authentication architecture, integration testing, and Cloud Run deployment.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.26 or higher
 - Make (optional, for build scripts)
 - Node.js 18+ (for E2E testing)
 - npm or yarn (for E2E testing)
@@ -270,8 +261,6 @@ Potential improvements for production deployment:
 - Add database integration (PostgreSQL, etc.)
 - Add API versioning
 - Add rate limiting
-- Add containerization (Docker)
-- Add CI/CD pipeline
 - Add more E2E test coverage for authentication flows
 
 ## License

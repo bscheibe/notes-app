@@ -120,29 +120,6 @@ func TestAuthHandlerIntegration_LoginFlow(t *testing.T) {
 }
 ```
 
-#### 2. **Server Integration Tests**
-Location: `internal/server/server_integration_test.go`
-
-**Purpose:** Test full application server with routing and middleware
-
-**What They Test:**
-- Route registration
-- Middleware chain
-- Static file serving
-- Health endpoints
-- Error handling
-- Concurrent request handling
-- Server lifecycle
-
-**Example:**
-```go
-func TestServerIntegration_AuthenticationFlow(t *testing.T) {
-    // Start full server
-    // Make real HTTP requests
-    // Test complete user flows
-}
-```
-
 ## Highest Leverage Integration Tests
 
 ### 1. **Complete Authentication Flow**
@@ -347,21 +324,9 @@ go test ./... -cover -run Integration
 
 ## Continuous Integration
 
-### GitHub Actions Example
-```yaml
-name: Integration Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
-        with:
-          go-version: '1.21'
-      - name: Run integration tests
-        run: go test ./... -run Integration -v
-```
+Integration tests run as part of the standard `go test ./... -race -shuffle=on`
+step in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) - there's no
+separate CI job for them.
 
 ## End-to-End Testing with Playwright
 
@@ -397,12 +362,15 @@ npm run test:e2e:install
 ```
 tests/
 ├── e2e/              # E2E test specifications
-│   └── note-save.spec.ts
+│   ├── note-save.spec.ts
+│   └── guest-isolation.spec.ts
 ├── pages/            # Page Object Model classes
 │   ├── BasePage.ts
 │   └── HomePage.ts
-└── fixtures/         # Test data and configuration
-    └── test-config.ts
+├── fixtures/         # Test data and configuration
+│   └── test-config.ts
+├── global-setup.ts
+└── global-teardown.ts
 ```
 
 ### Page Object Model
