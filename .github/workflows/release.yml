@@ -77,7 +77,7 @@ jobs:
           subject-path: notes-app-linux-amd64
 
       - name: Upload binary and SBOM to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ needs.tag-and-release.outputs.version }}
           files: |
