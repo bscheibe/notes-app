@@ -115,7 +115,7 @@ jobs:
       # WIF, not a downloaded service-account key - see docs/CLOUD_RUN_CICD_BOOTSTRAP.md.
       - name: Authenticate to GCP via Workload Identity Federation
         id: auth
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
