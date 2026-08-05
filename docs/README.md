@@ -37,6 +37,20 @@ system:
 - Test migration strategy
 - Sequenced implementation steps (not yet executed)
 
+### [Storage Abuse Prevention](STORAGE_ABUSE_PREVENTION.md)
+Analysis of how a public deployment could be abused to dump unbounded data
+into the system, written against the post-migration (database + Firebase Auth)
+architecture:
+- Attack surface analysis: oversized notes, note flooding, update-churn
+  amplification, and identity multiplication
+- Why per-identity quotas are worthless without a scarce identity, and the
+  recommendation on anonymous/guest write access
+- Layered defenses (L1-L11): body caps, field validation, per-identity quotas,
+  rate limiting, platform resource limits, timeouts, Firebase-side identity
+  controls, and a global ceiling with kill switch
+- A complete inventory of all 45 levers, each with a concrete aggressive value
+- Aggressive TTL design and datastore-specific tradeoffs (Firestore vs Cloud SQL)
+
 ### [Cloud Run Deployment Plan](CLOUD_RUN_DEPLOYMENT_PLAN.md)
 Plan for standing up the API on Google Cloud Run:
 - Why the API must run with public ingress, and how Firebase ID token
