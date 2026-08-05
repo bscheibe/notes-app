@@ -1,1 +1,0 @@
-{"name":"notes-app-e2e-tests","version":"1.0.0","description":"E2E tests for Notes App using Playwright","scripts":{"test:e2e":"playwright test","test:e2e:headed":"playwright test --headed","test:e2e:debug":"playwright test --debug","test:e2e:install":"playwright install"},"devDependencies":{"@playwright/test":"^1.40.0","@types/node":"^26.1.2","typescript":"^7.0.2"}}

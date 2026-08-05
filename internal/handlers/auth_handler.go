@@ -3,7 +3,6 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"html/template"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -48,22 +47,6 @@ func (h *AuthHandler) GetStore() *sessions.CookieStore {
 // GetSessionName returns the session name for use by middleware
 func (h *AuthHandler) GetSessionName() string {
 	return h.sessionName
-}
-
-// HandleLogin renders the login page
-func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	// Render the login page template
-	tmpl, err := template.ParseFiles("templates/login.html")
-	if err != nil {
-		http.Error(w, "Failed to load template", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	err = tmpl.Execute(w, nil)
-	if err != nil {
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-	}
 }
 
 // HandleGoogleOAuth initiates Google OAuth flow
@@ -237,7 +220,6 @@ func generateState() (string, error) {
 
 // RegisterRoutes registers authentication routes
 func (h *AuthHandler) RegisterRoutes(r chi.Router) {
-	r.Get("/login", h.HandleLogin)
 	r.Get("/auth/google", h.HandleGoogleOAuth)
 	r.Get("/auth/github", h.HandleGitHubOAuth)
 	r.Get("/auth/callback", h.HandleOAuthCallback)

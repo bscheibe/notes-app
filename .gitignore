@@ -30,18 +30,6 @@ config.dev.yaml
 .DS_Store
 Thumbs.db
 
-# Node.js / Playwright
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-yarn.lock
-playwright-report/
-test-results/
-playwright/.cache/
-dist/
-
 # Terraform - infra/ is applied manually by a human (`terraform apply`),
 # never by CI. State is local; the plugin cache and state files are
 # ignored, but .terraform.lock.hcl is intentionally committed (standard

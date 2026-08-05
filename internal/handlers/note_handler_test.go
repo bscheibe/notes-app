@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"html/template"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -28,18 +28,8 @@ func setupTestHandler(t *testing.T) (*NoteHandler, *service.NoteService) {
 
 	noteService := service.NewNoteService(repo, logger)
 
-	// Create a minimal handler without monitoring for testing
-	handler := &NoteHandler{
-		service: noteService,
-		logger:  logger,
-		metrics: nil,
-		tracer:  nil,
-	}
-
-	// Use a simple inline template for testing
-	tmpl, err := template.New("test").Parse(`<!DOCTYPE html><html><body>Notes App</body></html>`)
+	handler, err := NewNoteHandler(noteService, logger, nil, nil)
 	require.NoError(t, err)
-	handler.tmpl = tmpl
 
 	return handler, noteService
 }
@@ -53,20 +43,21 @@ func addSessionIDToRequest(r *http.Request, sessionID string) *http.Request {
 func TestNoteHandler_HandleHome(t *testing.T) {
 	handler, _ := setupTestHandler(t)
 
-	t.Run("renders home page with empty notes list", func(t *testing.T) {
+	t.Run("returns empty notes list", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		rr := httptest.NewRecorder()
 
 		handler.HandleHome(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		body := rr.Body.String()
-		assert.Contains(t, body, "<!DOCTYPE html>")
-		assert.Contains(t, body, "Notes App")
+		assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+		var body models.NoteList
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+		assert.Empty(t, body.Notes)
 	})
 
-	t.Run("renders home page with notes", func(t *testing.T) {
-		// Create a test note
+	t.Run("returns notes for the requesting user", func(t *testing.T) {
 		createReq := &models.CreateNoteRequest{
 			Title:   "Test Note",
 			Content: "Test content",
@@ -81,9 +72,10 @@ func TestNoteHandler_HandleHome(t *testing.T) {
 		handler.HandleHome(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		body := rr.Body.String()
-		assert.Contains(t, body, "<!DOCTYPE html>")
-		assert.Contains(t, body, "Notes App")
+
+		var body models.NoteList
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+		assert.Len(t, body.Notes, 1)
 	})
 }
 
@@ -111,9 +103,11 @@ func TestNoteHandler_HandleViewNote(t *testing.T) {
 		handler.HandleViewNote(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		body := rr.Body.String()
-		assert.Contains(t, body, "<!DOCTYPE html>")
-		assert.Contains(t, body, "Notes App")
+
+		var body models.Note
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+		assert.Equal(t, "Test Note", body.Title)
+		assert.Equal(t, "Test content", body.Content)
 	})
 
 	t.Run("view non-existent note returns 404", func(t *testing.T) {
@@ -129,7 +123,7 @@ func TestNoteHandler_HandleViewNote(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, rr.Code)
 	})
 
-	t.Run("empty filename redirects to home", func(t *testing.T) {
+	t.Run("empty filename returns 400", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/notes/", nil)
 		rr := httptest.NewRecorder()
 
@@ -139,8 +133,7 @@ func TestNoteHandler_HandleViewNote(t *testing.T) {
 
 		handler.HandleViewNote(rr, req)
 
-		assert.Equal(t, http.StatusSeeOther, rr.Code)
-		assert.Equal(t, "/", rr.Header().Get("Location"))
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 }
 
@@ -156,8 +149,11 @@ func TestNoteHandler_HandleSaveNote(t *testing.T) {
 
 		handler.HandleSaveNote(rr, req)
 
-		assert.Equal(t, http.StatusSeeOther, rr.Code)
-		assert.Equal(t, "/", rr.Header().Get("Location"))
+		assert.Equal(t, http.StatusOK, rr.Code)
+
+		var body models.Note
+		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+		assert.Equal(t, "New Note", body.Title)
 
 		// Verify note was created
 		notes, err := handler.service.ListNotes("test-user")
@@ -183,8 +179,7 @@ func TestNoteHandler_HandleSaveNote(t *testing.T) {
 
 		handler.HandleSaveNote(rr, req)
 
-		assert.Equal(t, http.StatusSeeOther, rr.Code)
-		assert.Equal(t, "/", rr.Header().Get("Location"))
+		assert.Equal(t, http.StatusOK, rr.Code)
 	})
 
 	t.Run("empty title shows error", func(t *testing.T) {
@@ -196,8 +191,7 @@ func TestNoteHandler_HandleSaveNote(t *testing.T) {
 
 		handler.HandleSaveNote(rr, req)
 
-		// Should return 200 with error message in template
-		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 
 	t.Run("empty content shows error", func(t *testing.T) {
@@ -209,8 +203,7 @@ func TestNoteHandler_HandleSaveNote(t *testing.T) {
 
 		handler.HandleSaveNote(rr, req)
 
-		// Should return 200 with error message in template
-		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 
 	t.Run("invalid form parsing returns 400", func(t *testing.T) {
@@ -221,7 +214,7 @@ func TestNoteHandler_HandleSaveNote(t *testing.T) {
 		handler.HandleSaveNote(rr, req)
 
 		// The form parsing actually succeeds, so we get validation error instead
-		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 }
 
@@ -270,11 +263,6 @@ func TestNoteHandler_GetLogger(t *testing.T) {
 }
 
 func TestNewNoteHandler(t *testing.T) {
-	// This test will fail if templates/index.html doesn't exist
-	// For a real test, you'd need to ensure the template file exists
-	// or mock the template parsing
-	t.Skip("Skipping test that requires actual template file")
-
 	tempDir := t.TempDir()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -284,9 +272,6 @@ func TestNewNoteHandler(t *testing.T) {
 	noteService := service.NewNoteService(repo, logger)
 
 	handler, err := NewNoteHandler(noteService, logger, nil, nil)
-	if err != nil {
-		t.Skip("Template file not found, skipping")
-	}
 
 	require.NoError(t, err)
 	require.NotNil(t, handler)

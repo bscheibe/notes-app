@@ -133,9 +133,6 @@ func New(cfg *config.Config, logger *slog.Logger) (*Server, error) {
 
 // setupRoutes configures all HTTP routes
 func setupRoutes(r *chi.Mux, handler *handlers.NoteHandler, authHandler *handlers.AuthHandler, authMiddleware *authMiddleware.AuthMiddleware, metrics *monitoring.Metrics, health *monitoring.HealthChecker, logger *slog.Logger) {
-	// Serve static files
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-
 	// Monitoring endpoints
 	if metrics != nil {
 		promHandler, err := monitoring.SetupPrometheusExporter(logger)

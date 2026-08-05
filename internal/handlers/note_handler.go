@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"html/template"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -18,45 +18,21 @@ import (
 type NoteHandler struct {
 	service *service.NoteService
 	logger  *slog.Logger
-	tmpl    *template.Template
 	metrics *monitoring.Metrics
 	tracer  *monitoring.Tracer
 }
 
-// PageData represents the data passed to HTML templates
-type PageData struct {
-	Message          string
-	Title            string
-	Content          string
-	OriginalFilename string
-	Notes            []string
-	User             *UserInfo
-}
-
-// UserInfo represents user information for templates
-type UserInfo struct {
-	Name      string
-	AvatarURL string
-	IsGuest   bool
-}
-
 // NewNoteHandler creates a new note handler
 func NewNoteHandler(service *service.NoteService, logger *slog.Logger, metrics *monitoring.Metrics, tracer *monitoring.Tracer) (*NoteHandler, error) {
-	tmpl, err := template.ParseFiles("templates/index.html")
-	if err != nil {
-		return nil, err
-	}
-
 	return &NoteHandler{
 		service: service,
 		logger:  logger,
-		tmpl:    tmpl,
 		metrics: metrics,
 		tracer:  tracer,
 	}, nil
 }
 
-// HandleHome handles the home page with note list
+// HandleHome lists notes for the current user
 func (h *NoteHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 	// Start tracing span if enabled
 	var span trace.Span
@@ -82,31 +58,14 @@ func (h *NoteHandler) HandleHome(w http.ResponseWriter, r *http.Request) {
 		if h.metrics != nil {
 			h.metrics.RecordNoteReadError()
 		}
-		h.renderError(w, "Failed to load notes")
+		h.writeError(w, http.StatusInternalServerError, "Failed to load notes")
 		return
 	}
 
-	// Get user from context
-	var userInfo *UserInfo
-	user, userExists := middleware.GetUserFromContext(r)
-	if userExists {
-		userInfo = &UserInfo{
-			Name:      user.Name,
-			AvatarURL: user.AvatarURL,
-			IsGuest:   user.Provider == models.ProviderGuest,
-		}
-	}
-
-	data := PageData{
-		Message: "",
-		Notes:   notes,
-		User:    userInfo,
-	}
-
-	h.renderTemplate(w, data)
+	h.writeJSON(w, http.StatusOK, models.NoteList{Notes: toNoteStubs(notes)})
 }
 
-// HandleViewNote handles viewing a specific note
+// HandleViewNote returns a specific note
 func (h *NoteHandler) HandleViewNote(w http.ResponseWriter, r *http.Request) {
 	// Start tracing span if enabled
 	var span trace.Span
@@ -117,7 +76,7 @@ func (h *NoteHandler) HandleViewNote(w http.ResponseWriter, r *http.Request) {
 
 	filename := chi.URLParam(r, "filename")
 	if filename == "" {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		h.writeError(w, http.StatusBadRequest, "Filename is required")
 		return
 	}
 
@@ -138,39 +97,11 @@ func (h *NoteHandler) HandleViewNote(w http.ResponseWriter, r *http.Request) {
 		if h.metrics != nil {
 			h.metrics.RecordNoteReadError()
 		}
-		http.Error(w, "Note not found", http.StatusNotFound)
+		h.writeError(w, http.StatusNotFound, "Note not found")
 		return
 	}
 
-	// Get all notes for the sidebar
-	// userID is already set above
-
-	notes, err := h.service.ListNotes(userID)
-	if err != nil {
-		h.logger.Error("Failed to list notes", "error", err)
-	}
-
-	// Get user from context
-	var userInfo *UserInfo
-	user, userExists := middleware.GetUserFromContext(r)
-	if userExists {
-		userInfo = &UserInfo{
-			Name:      user.Name,
-			AvatarURL: user.AvatarURL,
-			IsGuest:   user.Provider == models.ProviderGuest,
-		}
-	}
-
-	data := PageData{
-		Message:          "",
-		Title:            note.Title,
-		Content:          note.Content,
-		OriginalFilename: note.Filename,
-		Notes:            notes,
-		User:             userInfo,
-	}
-
-	h.renderTemplate(w, data)
+	h.writeJSON(w, http.StatusOK, note)
 }
 
 // HandleSaveNote handles creating or updating a note
@@ -189,7 +120,7 @@ func (h *NoteHandler) HandleSaveNote(w http.ResponseWriter, r *http.Request) {
 		if h.tracer != nil {
 			h.tracer.RecordError(span, err)
 		}
-		http.Error(w, "Error parsing form", http.StatusBadRequest)
+		h.writeError(w, http.StatusBadRequest, "Error parsing form")
 		return
 	}
 
@@ -211,16 +142,17 @@ func (h *NoteHandler) HandleSaveNote(w http.ResponseWriter, r *http.Request) {
 		OriginalFilename: originalFilename,
 	}
 
+	var note *models.Note
 	var err error
 
 	// If editing an existing note
 	if originalFilename != "" {
-		_, err = h.service.UpdateNote(userID, originalFilename, req)
+		note, err = h.service.UpdateNote(userID, originalFilename, req)
 		if err == nil && h.metrics != nil {
 			h.metrics.RecordNoteUpdated(ctx)
 		}
 	} else {
-		_, err = h.service.CreateNote(userID, req)
+		note, err = h.service.CreateNote(userID, req)
 		if err == nil && h.metrics != nil {
 			h.metrics.RecordNoteCreated(ctx)
 		}
@@ -234,39 +166,25 @@ func (h *NoteHandler) HandleSaveNote(w http.ResponseWriter, r *http.Request) {
 		if h.metrics != nil {
 			h.metrics.RecordNoteWriteError()
 		}
-
-		// Get notes for sidebar
-		notes, _ := h.service.ListNotes(userID)
-
-		data := PageData{
-			Message: h.getErrorMessage(err),
-			Title:   title,
-			Content: content,
-			Notes:   notes,
-		}
-		h.renderTemplate(w, data)
+		h.writeError(w, http.StatusBadRequest, h.getErrorMessage(err))
 		return
 	}
 
-	// Redirect to home page
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	h.writeJSON(w, http.StatusOK, note)
 }
 
-// renderTemplate renders the HTML template with the given data
-func (h *NoteHandler) renderTemplate(w http.ResponseWriter, data PageData) {
-	if err := h.tmpl.Execute(w, data); err != nil {
-		h.logger.Error("Failed to render template", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+// writeJSON writes a JSON response with the given status code
+func (h *NoteHandler) writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		h.logger.Error("Failed to encode response", "error", err)
 	}
 }
 
-// renderError renders an error message
-func (h *NoteHandler) renderError(w http.ResponseWriter, message string) {
-	data := PageData{
-		Message: message,
-		Notes:   []string{},
-	}
-	h.renderTemplate(w, data)
+// writeError writes a JSON error response
+func (h *NoteHandler) writeError(w http.ResponseWriter, status int, message string) {
+	h.writeJSON(w, status, map[string]string{"error": message})
 }
 
 // getErrorMessage converts service errors to user-friendly messages
@@ -286,4 +204,13 @@ func (h *NoteHandler) getErrorMessage(err error) string {
 // GetLogger returns the logger for external use
 func (h *NoteHandler) GetLogger() *slog.Logger {
 	return h.logger
+}
+
+// toNoteStubs converts filenames into minimal note list entries
+func toNoteStubs(filenames []string) []models.Note {
+	notes := make([]models.Note, 0, len(filenames))
+	for _, filename := range filenames {
+		notes = append(notes, models.Note{Filename: filename})
+	}
+	return notes
 }
