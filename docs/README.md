@@ -51,6 +51,16 @@ architecture:
 - A complete inventory of all 45 levers, each with a concrete aggressive value
 - Aggressive TTL design and datastore-specific tradeoffs (Firestore vs Cloud SQL)
 
+### [No Anonymous Server Access](NO_ANONYMOUS_SERVER_ACCESS.md)
+How anonymous usage is eliminated entirely from the server's perspective, as
+the counterpart to notes-webpage storing guest notes client-side:
+- The invariant: no code path lets a caller without a federated identity write
+  to persistent storage
+- Enforcement via the token's `sign_in_provider` claim (allowlist, not denylist)
+- What gets deleted, and which abuse levers this eliminates rather than bounds
+- The one path where guest-originated data legitimately reaches the server
+  (sign-in migration) and why it must be quota-checked
+
 ### [Cloud Run Deployment Plan](CLOUD_RUN_DEPLOYMENT_PLAN.md)
 Plan for standing up the API on Google Cloud Run:
 - Why the API must run with public ingress, and how Firebase ID token
